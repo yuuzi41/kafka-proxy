@@ -1,6 +1,8 @@
 package org.frostplain.kafkaproxy
 
+import java.io.{FileInputStream, IOException}
 import java.lang
+import java.util.Properties
 
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.nio.NioEventLoopGroup
@@ -15,7 +17,18 @@ object Main {
     val bossGroup = new NioEventLoopGroup()
     val workerGroup = new NioEventLoopGroup()
 
-//    KafkaController.init(new Properties())
+    val properties = new Properties()
+
+    try {
+      val stream = new FileInputStream("kafka.properties")
+      properties.load(stream)
+    } catch {
+      case e: IOException =>
+        e.printStackTrace()
+        return
+    }
+    KafkaController.init(properties)
+
     try {
       val bootstrap = new ServerBootstrap()
       bootstrap.group(bossGroup, workerGroup)
@@ -31,15 +44,15 @@ object Main {
         })
         .option(ChannelOption.SO_BACKLOG, new Integer(128))
         .childOption(ChannelOption.SO_KEEPALIVE, new lang.Boolean(true))
-        .localAddress(10000)
+        .localAddress(18080)
 
       val f = bootstrap.bind().sync()
       println("Binded")
 
       f.channel().closeFuture().sync()
     } finally {
-      workerGroup.shutdownGracefully()
-      bossGroup.shutdownGracefully()
+      workerGroup.shutdownGracefully
+      bossGroup.shutdownGracefully
     }
   }
 }

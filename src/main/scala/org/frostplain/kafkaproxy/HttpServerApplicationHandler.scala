@@ -10,18 +10,18 @@ import org.apache.kafka.clients.producer.ProducerRecord
 import org.slf4j.LoggerFactory
 
 class HttpServerApplicationHandler extends ChannelInboundHandlerAdapter {
-  private val CONTENT = "Hello world".getBytes
   private val CONTENT_TYPE = AsciiString.cached("Content-Type")
   private val CONTENT_LENGTH = AsciiString.cached("Content-Length")
   private val CONNECTION = AsciiString.cached("Connection")
   private val KEEP_ALIVE = AsciiString.cached("keep-alive")
 
-  private val ALIVE_MESSAGE = Unpooled.wrappedBuffer("{status: 0}".getBytes())
+  private val ALIVE_MESSAGE = Unpooled.wrappedBuffer("{alive: 1}".getBytes())
+  private val OK_MESSAGE = Unpooled.wrappedBuffer("{status: 0}".getBytes())
 
-  val logger = LoggerFactory.getLogger(classOf[HttpServerApplicationHandler])
+  private val logger = LoggerFactory.getLogger(classOf[HttpServerApplicationHandler])
 
   var keepAlive = false
-  var receiving= false
+  var receiving = false
   var buffer:Option[ByteBuffer] = None
 
   override def channelReadComplete(ctx: ChannelHandlerContext): Unit = {
@@ -68,7 +68,7 @@ class HttpServerApplicationHandler extends ChannelInboundHandlerAdapter {
               case Some(actual) =>
                 KafkaController.producer match {
                   case Some(producer) =>
-                    val record = new ProducerRecord[String,Array[Byte]]("test", actual.array())
+                    val record = new ProducerRecord[String, Array[Byte]]("test", actual.array())
                     //todo: support callback and response
                     producer.send(record)
                   case None =>
@@ -81,12 +81,8 @@ class HttpServerApplicationHandler extends ChannelInboundHandlerAdapter {
             // explicit dereference
             buffer = None
             receiving = false
-            val response = new DefaultFullHttpResponse(
-              io.netty.handler.codec.http.HttpVersion.HTTP_1_1,
-              io.netty.handler.codec.http.HttpResponseStatus.OK,
-              Unpooled.wrappedBuffer(CONTENT)
-            )
-            response.headers.set(CONTENT_TYPE, "text/plain")
+            val response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, OK_MESSAGE)
+            response.headers.set(CONTENT_TYPE, "application/json")
             response.headers.setInt(CONTENT_LENGTH, response.content.readableBytes)
             this.responseWithKeepAlive(ctx, response)
           }
@@ -96,8 +92,9 @@ class HttpServerApplicationHandler extends ChannelInboundHandlerAdapter {
   }
 
   def responseWithKeepAlive(ctx: ChannelHandlerContext, response: HttpResponse): Unit ={
-    if (!keepAlive) ctx.write(response).addListener(ChannelFutureListener.CLOSE)
-    else {
+    if (!keepAlive) {
+      ctx.write(response).addListener(ChannelFutureListener.CLOSE)
+    } else {
       response.headers.set(CONNECTION, KEEP_ALIVE)
       ctx.write(response)
     }
