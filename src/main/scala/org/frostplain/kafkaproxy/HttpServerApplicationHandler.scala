@@ -1,8 +1,6 @@
 package org.frostplain.kafkaproxy
 
-import java.nio.ByteBuffer
-
-import io.netty.buffer.Unpooled
+import io.netty.buffer.{ByteBuf, Unpooled}
 import io.netty.channel.{ChannelFutureListener, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.handler.codec.http._
 import io.netty.util.AsciiString
@@ -22,7 +20,7 @@ class HttpServerApplicationHandler extends ChannelInboundHandlerAdapter {
 
   var keepAlive = false
   var receiving = false
-  var buffer:Option[ByteBuffer] = None
+  var buffer:Option[ByteBuf] = None
 
   override def channelReadComplete(ctx: ChannelHandlerContext): Unit = {
     ctx.flush
@@ -39,7 +37,7 @@ class HttpServerApplicationHandler extends ChannelInboundHandlerAdapter {
 
             if (req.headers().contains(CONTENT_LENGTH)) {
               receiving = true
-              buffer = Some(ByteBuffer.allocate(HttpUtil.getContentLength(req).toInt))
+              buffer = Some(Unpooled.buffer(HttpUtil.getContentLength(req).toInt))
             }
           case HttpMethod.GET =>
             val response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, ALIVE_MESSAGE)
@@ -57,7 +55,9 @@ class HttpServerApplicationHandler extends ChannelInboundHandlerAdapter {
         case chunk: HttpContent =>
           buffer match {
             case Some(actual) =>
-              chunk.content().getBytes(actual.position(), actual)
+              val content = chunk.content()
+              content.getBytes(0, actual, content.capacity())
+              content.release()
             case None =>
               logger.warn("Get chunk but buffer is none. Something wrong")
           }
@@ -74,6 +74,8 @@ class HttpServerApplicationHandler extends ChannelInboundHandlerAdapter {
                   case None =>
                     logger.warn("Kafka Producer is not prepared.")
                 }
+                // release buffer
+                actual.release()
               case None =>
                 logger.warn("Get last chunk but buffer is none. Something wrong")
             }

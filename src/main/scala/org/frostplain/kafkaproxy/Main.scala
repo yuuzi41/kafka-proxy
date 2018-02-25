@@ -33,7 +33,7 @@ object Main {
       val bootstrap = new ServerBootstrap()
       bootstrap.group(bossGroup, workerGroup)
         .channel(classOf[NioServerSocketChannel])
-        .handler(new LoggingHandler(LogLevel.INFO))
+        .handler(new LoggingHandler(LogLevel.DEBUG))
         .childHandler(new ChannelInitializer[SocketChannel] {
           override def initChannel(ch: SocketChannel): Unit = {
             val pipeline = ch.pipeline()
@@ -51,8 +51,8 @@ object Main {
 
       f.channel().closeFuture().sync()
     } finally {
-      workerGroup.shutdownGracefully
-      bossGroup.shutdownGracefully
+      workerGroup.shutdownGracefully()
+      bossGroup.shutdownGracefully()
     }
   }
 }

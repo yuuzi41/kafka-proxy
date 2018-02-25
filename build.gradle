@@ -1,6 +1,10 @@
 group 'org.frostplain'
 version '1.0-SNAPSHOT'
 
+apply plugin:'application'
+
+mainClassName = "org.frostplain.kafkaproxy.Main"
+
 apply plugin: 'java'
 apply plugin: 'scala'
 
